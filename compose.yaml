@@ -1,0 +1,17 @@
+services:
+  thelounge_telegram_accounts:
+    image: nett/thelounge-telegram-accounts:0.1.0
+    volumes:
+      - ./data:/app/data:rw
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    env_file:
+      - local.env
+    user: root
+    # group_add:
+    #   - docker
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: always

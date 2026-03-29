@@ -1,0 +1,98 @@
+[project]
+name = "thelounge-telegram-accounts"
+version = "0.1.0"
+description = "Create TheLounge accounts with Telegram userbot"
+readme = "README.md"
+license = { text = "MIT" }
+
+authors = [
+    { name = "Theo Saveliev", email = "89431871+theosaveliev@users.noreply.github.com" }
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: POSIX",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Utilities",
+]
+
+keywords = ["telegram", "thelounge", "accounts"]
+
+requires-python = ">=3.14"
+
+dependencies = [
+    "cryptg>=0.5.2",
+    "docker>=7.1.0,<8.0.0",
+    "telethon>=1.42.0",
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.38.4,<2.0.0",
+    "mypy>=1.19.1,<2.0.0",
+    "poethepoet>=0.42.1",
+    "ruff>=0.15.8",
+    "types-docker>=7.1.0.20260328,<8.0.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.10,<0.11.0"]
+build-backend = "uv_build"
+
+[project.scripts]
+thelounge_telegram_accounts = "thelounge_telegram_accounts.main:main"
+
+[project.urls]
+github = "https://github.com/theosaveliev/thelounge-telegram-accounts"
+issues = "https://github.com/theosaveliev/thelounge-telegram-accounts/issues"
+
+[tool.uv]
+add-bounds = "major"
+
+[tool.uv.build-backend]
+source-exclude = [
+    ".env",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    "__pycache__",
+    ".DS_Store",
+    ".idea",
+    ".vscode",
+]
+
+wheel-exclude = [
+    ".env",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    "__pycache__",
+    ".DS_Store",
+    ".idea",
+    ".vscode",
+]
+
+[tool.poe.executor]
+type = "uv"
+
+[tool.poe.tasks]
+format = "ruff format"
+lint = "ruff check --fix ."
+mypy = "mypy ."
+pyright = "basedpyright ."
+dev = ["format", "lint", "mypy", "pyright"]
+docker = ["docker-build", "docker-push"]
+
+[tool.poe.tasks.docker-build]
+shell = """
+    IMAGE_TAG=nett/thelounge-telegram-accounts:$(uv version --short)
+    PLATFORM=linux/amd64,linux/arm64/v8
+    docker build --tag ${IMAGE_TAG} --platform ${PLATFORM} --file Dockerfile --no-cache .
+"""
+
+[tool.poe.tasks.docker-push]
+shell = """
+    IMAGE_TAG=nett/thelounge-telegram-accounts:$(uv version --short)
+    docker image push ${IMAGE_TAG}
+"""

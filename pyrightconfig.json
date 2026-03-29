@@ -1,0 +1,33 @@
+{
+  "typeCheckingMode": "strict",
+  "stubPath": "stubs",
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "**/.venv",
+    "**/__pycache__",
+  ],
+  "reportMissingImports": "error",
+  "reportMissingModuleSource": false,
+  "reportMissingTypeStubs": "warning",
+  "reportUnusedImport": "error",
+  "reportUnusedVariable": "error",
+  "reportPrivateUsage": "error",
+  "reportUnnecessaryCast": "warning",
+  "reportUnnecessaryTypeIgnoreComment": "warning",
+  "reportUnnecessaryComparison": "error",
+  "reportImplicitStringConcatenation": "error",
+  "reportUnnecessaryIsInstance": "warning",
+  "reportUnreachable": "warning",
+  "reportAny": "error",
+  "reportUnknownParameterType": "error",
+  "reportUnknownArgumentType": "error",
+  "reportUnknownVariableType": "error",
+  "reportUnknownMemberType": "error",
+  "reportUntypedFunctionDecorator": "error",
+  "reportUntypedClassDecorator": "error",
+  "reportUntypedBaseClass": "error",
+  "reportUntypedNamedTuple": "error",
+  "reportCallInDefaultInitializer": "warning",
+}
