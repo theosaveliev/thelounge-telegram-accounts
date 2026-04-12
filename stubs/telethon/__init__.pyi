@@ -2,6 +2,7 @@ import pathlib
 from collections.abc import Callable, Coroutine
 
 from telethon.events import NewMessage
+from telethon.types import User
 
 class TelegramClient:
     def __init__(
@@ -14,3 +15,6 @@ class TelegramClient:
     def on(
         self, event: NewMessage
     ) -> Callable[[Callable[..., Coroutine[object, object, None]]], None]: ...
+    async def send_message(
+        self, entity: int | str | User, message: str, *, parse_mode: str | None = None
+    ) -> None: ...

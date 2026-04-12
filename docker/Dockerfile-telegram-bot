@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+FROM ubuntu:noble
+
+RUN apt-get update -y \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -Rf /var/lib/apt/lists/*
+
+USER ubuntu:ubuntu
+WORKDIR /app
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/ubuntu/.local/bin/:$PATH"
+ENV UV_PYTHON_INSTALL_DIR="/app/python"
+
+COPY --chown=ubuntu:ubuntu pyproject.toml uv.lock README.md .
+COPY --chown=ubuntu:ubuntu src/shared src/shared
+COPY --chown=ubuntu:ubuntu src/telegram_bot src/telegram_bot
+
+RUN uv sync --extra telegram-bot --no-dev --no-editable --frozen \
+    && rm -Rf pyproject.toml uv.lock README.md src
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+CMD ["telegram-bot"]
