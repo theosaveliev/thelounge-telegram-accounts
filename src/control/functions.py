@@ -146,7 +146,8 @@ def create_thelounge_user_config(username: str, password: str) -> UserConfig:
 async def create_thelounge_user_files(sessionmaker: ASM) -> None:
     loop = asyncio.get_running_loop()
     async with sessionmaker() as session:
-        result = await session.stream(select(TheloungeAccount))
+        query = select(TheloungeAccount).where(TheloungeAccount.notified.is_(False))
+        result = await session.stream(query)
         async for account in result.scalars():
             config = create_thelounge_user_config(account.username, account.password)
             config_json = config.model_dump_json(exclude_none=True, indent=4)
@@ -215,7 +216,8 @@ def create_filebrowser_user(username: str, password: str) -> User:
 async def create_filebrowser_users_json(sessionmaker: ASM) -> None:
     loop = asyncio.get_running_loop()
     async with sessionmaker() as session:
-        result = await session.stream(select(FilebrowserAccount))
+        query = select(FilebrowserAccount).where(FilebrowserAccount.notified.is_(False))
+        result = await session.stream(query)
         users: list[User] = []
         async for account in result.scalars():
             user = create_filebrowser_user(account.username, account.password)
