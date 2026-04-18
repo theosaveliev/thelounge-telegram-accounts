@@ -1,6 +1,6 @@
 [project]
 name = "thelounge-telegram-accounts"
-version = "0.2.2"
+version = "0.2.3"
 description = "Self-hosted tool built for a local community setup"
 readme = "README.md"
 license = { text = "MIT" }

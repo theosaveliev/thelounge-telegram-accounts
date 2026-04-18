@@ -21,14 +21,7 @@ class AuthenticatedRequest(BaseModel):
 
 class TelegramRegistration(AuthenticatedRequest):
     id: int = Field(gt=0, le=999_999_999_999)
-    username: str = Field(min_length=5, max_length=32)
-
-    @field_validator("username")
-    @classmethod
-    def validate_isalnum(cls, v: str) -> str:
-        if not v.isalnum():
-            raise ValueError("Value is not alphanumeric")
-        return v
+    username: str = Field(pattern=r"^\w{5,32}$")
 
 
 class TelegramNotification(AuthenticatedRequest):
