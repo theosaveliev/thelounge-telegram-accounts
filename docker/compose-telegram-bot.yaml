@@ -1,19 +1,23 @@
 ---
 services:
-  tta_telegram_bot:
-    image: "nett/tta-telegram-bot:0.2.3"
-    container_name: tta_telegram_bot
+  "tta-telegram-bot-dev":
+    image: "nett/tta-telegram-bot:0.2.5"
+    container_name: "tta-telegram-bot-dev"
     volumes:
       - ../data:/app/data:rw
+
     env_file:
       - ../telegram.env
+
     ports:
       - "8002:8002"
+
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8002/health"]
       interval: 10s
       timeout: 2s
       retries: 3
       start_period: 10s
+
     restart: always
 ...

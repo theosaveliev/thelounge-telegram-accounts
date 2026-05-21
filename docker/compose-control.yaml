@@ -1,19 +1,23 @@
 ---
 services:
-  tta_control:
-    image: "nett/tta-control:0.2.3"
-    container_name: tta_control
+  "tta-control-dev":
+    image: "nett/tta-control:0.2.5"
+    container_name: "tta-control-dev"
     volumes:
       - ../data:/app/data:rw
+
     env_file:
       - ../control.env
+
     ports:
       - "8001:8001"
+
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8001/health"]
       interval: 10s
       timeout: 2s
       retries: 3
       start_period: 10s
+
     restart: always
 ...

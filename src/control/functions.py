@@ -213,10 +213,14 @@ def create_filebrowser_user(username: str, password: str) -> User:
     )
 
 
-async def create_filebrowser_users_json(sessionmaker: ASM) -> None:
+async def create_filebrowser_users_json(sessionmaker: ASM, new_only: bool) -> None:
     loop = asyncio.get_running_loop()
-    async with sessionmaker() as session:
+    if new_only:
         query = select(FilebrowserAccount).where(FilebrowserAccount.notified.is_(False))
+    else:
+        query = select(FilebrowserAccount)
+
+    async with sessionmaker() as session:
         result = await session.stream(query)
         users: list[User] = []
         async for account in result.scalars():

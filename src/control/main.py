@@ -91,12 +91,21 @@ async def notify_tl_users(req: AuthenticatedRequest) -> Response:
     return Response(status_code=HTTPStatus.CREATED)
 
 
-@app.post("/create_filebrowser_users_json")
-async def create_fb_users_json(req: AuthenticatedRequest) -> Response:
+@app.post("/create_filebrowser_new_users_json")
+async def create_fb_new_users_json(req: AuthenticatedRequest) -> Response:
     if not secrets.compare_digest(req.token, CONTROL_TOKEN):
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Invalid token")
 
-    await create_filebrowser_users_json(sessionmaker=Session)
+    await create_filebrowser_users_json(sessionmaker=Session, new_only=True)
+    return Response(status_code=HTTPStatus.CREATED)
+
+
+@app.post("/create_filebrowser_complete_users_json")
+async def create_fb_complete_users_json(req: AuthenticatedRequest) -> Response:
+    if not secrets.compare_digest(req.token, CONTROL_TOKEN):
+        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Invalid token")
+
+    await create_filebrowser_users_json(sessionmaker=Session, new_only=False)
     return Response(status_code=HTTPStatus.CREATED)
 
 
