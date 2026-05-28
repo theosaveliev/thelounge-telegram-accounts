@@ -15,11 +15,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from control.functions import (
     create_accounts,
-    create_filebrowser_users_json,
+    create_sftpgo_user_backup,
     create_thelounge_user_files,
     generate_password,
     list_all_users_pending,
-    notify_filebrowser_users,
+    notify_sftpgo_users,
     notify_thelounge_users,
 )
 from shared.schemas import (
@@ -91,30 +91,30 @@ async def notify_tl_users(req: AuthenticatedRequest) -> Response:
     return Response(status_code=HTTPStatus.CREATED)
 
 
-@app.post("/create_filebrowser_new_users_json")
+@app.post("/create_sftpgo_new_users_json")
 async def create_fb_new_users_json(req: AuthenticatedRequest) -> Response:
     if not secrets.compare_digest(req.token, CONTROL_TOKEN):
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Invalid token")
 
-    await create_filebrowser_users_json(sessionmaker=Session, new_only=True)
+    await create_sftpgo_user_backup(sessionmaker=Session, new_only=True)
     return Response(status_code=HTTPStatus.CREATED)
 
 
-@app.post("/create_filebrowser_complete_users_json")
+@app.post("/create_sftpgo_complete_users_json")
 async def create_fb_complete_users_json(req: AuthenticatedRequest) -> Response:
     if not secrets.compare_digest(req.token, CONTROL_TOKEN):
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Invalid token")
 
-    await create_filebrowser_users_json(sessionmaker=Session, new_only=False)
+    await create_sftpgo_user_backup(sessionmaker=Session, new_only=False)
     return Response(status_code=HTTPStatus.CREATED)
 
 
-@app.post("/notify_filebrowser_users")
+@app.post("/notify_sftpgo_users")
 async def notify_fb_users(req: AuthenticatedRequest) -> Response:
     if not secrets.compare_digest(req.token, CONTROL_TOKEN):
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Invalid token")
 
-    await notify_filebrowser_users(sessionmaker=Session, http_client=http_client)
+    await notify_sftpgo_users(sessionmaker=Session, http_client=http_client)
     return Response(status_code=HTTPStatus.CREATED)
 
 

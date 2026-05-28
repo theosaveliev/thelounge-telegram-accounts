@@ -12,13 +12,13 @@ from sqlalchemy import select
 
 from shared.schemas import TelegramNotification
 
-from .filebrowser_shemas import Permissions, Sorting, User, UsersJson
 from .models import (
-    FilebrowserAccount,
     ServiceAccountMixin,
+    SFTPGoAccount,
     TelegramAccount,
     TheloungeAccount,
 )
+from .sftpgo_schemas import SFTPGoAdmin, SFTPGoBackup, SFTPGoUser
 from .thelounge_schemas import BrowserInfo, NetworkConfig, UserConfig
 
 if TYPE_CHECKING:
@@ -31,22 +31,23 @@ if TYPE_CHECKING:
 
 __all__ = [
     "create_accounts",
-    "create_filebrowser_users_json",
+    "create_sftpgo_user_backup",
     "create_thelounge_user_files",
     "generate_password",
     "list_all_users_pending",
     "notify_thelounge_users",
 ]
 
+BOT_URL = os.environ["BOT_URL"]
+BOT_TOKEN = os.environ["BOT_TOKEN"]
 IRC_NAME = os.environ["IRC_NAME"]
 IRC_HOST = os.environ["IRC_HOST"]
 IRC_PORT = int(os.environ["IRC_PORT"])
 IRC_PASSWORD = os.environ["IRC_PASSWORD"]
-IRC_USER_DIR = Path(os.environ["IRC_USER_DIR"])
-BOT_URL = os.environ["BOT_URL"]
-BOT_TOKEN = os.environ["BOT_TOKEN"]
-FILES_ADMIN = os.environ["FILES_ADMIN"]
-FILES_USER_DIR = Path(os.environ["FILES_USER_DIR"])
+THELOUNGE_USERS_DIR = Path(os.environ["THELOUNGE_USERS_DIR"])
+SFTPGO_ADMIN = os.environ["SFTPGO_ADMIN"]
+SFTPGO_DATA_DIR = os.environ["SFTPGO_DATA_DIR"]
+SFTPGO_BACKUP_DIR = Path(os.environ["SFTPGO_BACKUP_DIR"])
 
 
 def generate_password(length: int) -> str:
@@ -78,7 +79,7 @@ async def create_accounts(
     sessionmaker: ASM, request: TelegramRegistration, password: str, timestamp: int
 ) -> None:
     pw_tl = hash_bcrypt(password, rounds=11)
-    pw_fb = hash_bcrypt(password, rounds=10)
+    pw_sftp = hash_bcrypt(password, rounds=10)
 
     tg_acc = TelegramAccount(
         id=request.id, username=request.username, updated=timestamp, meta=""
@@ -92,16 +93,16 @@ async def create_accounts(
         updated=timestamp,
     )
 
-    fb_acc = FilebrowserAccount(
+    sftp_acc = SFTPGoAccount(
         id=request.id,
         username=request.username,
-        password=pw_fb,
+        password=pw_sftp,
         notified=False,
         updated=timestamp,
     )
 
     async with sessionmaker() as session:
-        session.add_all([tg_acc, tl_acc, fb_acc])
+        session.add_all([tg_acc, tl_acc, sftp_acc])
         await session.commit()
 
 
@@ -151,7 +152,7 @@ async def create_thelounge_user_files(sessionmaker: ASM) -> None:
         async for account in result.scalars():
             config = create_thelounge_user_config(account.username, account.password)
             config_json = config.model_dump_json(exclude_none=True, indent=4)
-            user_file = IRC_USER_DIR / f"{account.username}.json"
+            user_file = THELOUNGE_USERS_DIR / f"{account.username}.json"
 
             def write_file(uf: Path = user_file, cj: str = config_json) -> None:
                 uf.write_text(cj, encoding="utf-8")
@@ -180,71 +181,56 @@ async def notify_thelounge_users(sessionmaker: ASM, http_client: AsyncClient) ->
         await session.commit()
 
 
-def create_filebrowser_user(username: str, password: str) -> User:
-    sorting = Sorting(by="name", asc=False)
-    scope = "/" if username == FILES_ADMIN else f"/users/{username}"
-    perm = Permissions(
-        admin=(username == FILES_ADMIN),
-        execute=False,
-        create=True,
-        rename=True,
-        modify=True,
-        delete=True,
-        share=True,
-        download=True,
-    )
-
-    return User(
-        username=username,
-        password=password,
-        scope=scope,
-        locale="en",
-        lockPassword=False,
-        viewMode="mosaic",
-        singleClick=True,
-        redirectAfterCopyMove=True,
-        perm=perm,
-        commands=[],
-        sorting=sorting,
-        rules=[],
-        hideDotfiles=False,
-        dateFormat=False,
-        aceEditorTheme="",
-    )
-
-
-async def create_filebrowser_users_json(sessionmaker: ASM, new_only: bool) -> None:
-    loop = asyncio.get_running_loop()
-    if new_only:
-        query = select(FilebrowserAccount).where(FilebrowserAccount.notified.is_(False))
+def create_sftpgo_user(username: str, password: str) -> SFTPGoUser:
+    if username == SFTPGO_ADMIN:
+        home = SFTPGO_DATA_DIR
     else:
-        query = select(FilebrowserAccount)
+        home = f"{SFTPGO_DATA_DIR}/users/{username}"
 
+    return SFTPGoUser(username=username, password=password, home_dir=home)
+
+
+async def create_sftpgo_user_backup(sessionmaker: ASM, new_only: bool) -> None:
+    loop = asyncio.get_running_loop()
     async with sessionmaker() as session:
-        result = await session.stream(query)
-        users: list[User] = []
-        async for account in result.scalars():
-            user = create_filebrowser_user(account.username, account.password)
+        users: list[SFTPGoUser] = []
+        if new_only:
+            uquery = select(SFTPGoAccount).where(SFTPGoAccount.notified.is_(False))
+        else:
+            uquery = select(SFTPGoAccount)
+
+        ures = await session.stream(uquery)
+        async for uacc in ures.scalars():
+            user = create_sftpgo_user(username=uacc.username, password=uacc.password)
             users.append(user)
 
-        users_json = UsersJson(users).model_dump_json(exclude_none=True, indent=4)
-        users_file = FILES_USER_DIR / "users.json"
+        admins: list[SFTPGoAdmin] = []
+        aquery = select(SFTPGoAccount).where(SFTPGoAccount.username == SFTPGO_ADMIN)
+        ares = await session.execute(aquery)
+        aacc = ares.scalar_one_or_none()
+        if aacc is not None:
+            admin = SFTPGoAdmin(username=aacc.username, password=aacc.password)
+            admins.append(admin)
 
-        def write_file(uf: Path = users_file, uj: str = users_json) -> None:
-            uf.write_text(uj, encoding="utf-8")
+        backup = SFTPGoBackup(users=users, admins=admins)
+        backup_json = backup.model_dump_json(exclude_none=True, indent=4)
+        backup_file = SFTPGO_BACKUP_DIR / "backup.json"
+
+        def write_file(bfile: Path = backup_file, bjson: str = backup_json) -> None:
+            bfile.write_text(bjson, encoding="utf-8")
 
         await loop.run_in_executor(None, write_file)
 
 
-async def notify_filebrowser_users(sessionmaker: ASM, http_client: AsyncClient) -> None:
+async def notify_sftpgo_users(sessionmaker: ASM, http_client: AsyncClient) -> None:
     url = f"{BOT_URL}/notify"
     async with sessionmaker() as session:
-        query = select(FilebrowserAccount).where(FilebrowserAccount.notified.is_(False))
+        query = select(SFTPGoAccount).where(SFTPGoAccount.notified.is_(False))
         result = await session.stream(query)
-        accounts: list[FilebrowserAccount] = []
+        accounts: list[SFTPGoAccount] = []
         async for account in result.scalars():
             notification = TelegramNotification(
-                token=BOT_TOKEN, id=account.id, message="Your Files account is ready."
+                token=BOT_TOKEN, id=account.id, message="Your SFTPGo account is ready."
             )
 
             resp = await http_client.post(url, json=notification.model_dump())
@@ -276,5 +262,5 @@ async def list_users_pending(
 
 async def list_all_users_pending(sessionmaker: ASM) -> dict[str, UserInfo]:
     thelounge = await list_users_pending(sessionmaker, TheloungeAccount)
-    filebrowser = await list_users_pending(sessionmaker, FilebrowserAccount)
-    return {"thelounge": thelounge, "filebrowser": filebrowser}
+    sftpgo = await list_users_pending(sessionmaker, SFTPGoAccount)
+    return {"thelounge": thelounge, "sftpgo": sftpgo}

@@ -1,7 +1,7 @@
 from sqlalchemy import BigInteger, Boolean, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-__all__ = ["FilebrowserAccount", "TelegramAccount", "TheloungeAccount"]
+__all__ = ["SFTPGoAccount", "TelegramAccount", "TheloungeAccount"]
 
 
 class Base(DeclarativeBase):
@@ -29,5 +29,5 @@ class TheloungeAccount(ServiceAccountMixin, Base):
     __tablename__ = "thelounge_accounts"
 
 
-class FilebrowserAccount(ServiceAccountMixin, Base):
-    __tablename__ = "filebrowser_accounts"
+class SFTPGoAccount(ServiceAccountMixin, Base):
+    __tablename__ = "sftpgo_accounts"
