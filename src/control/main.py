@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from control.functions import (
     create_accounts,
-    create_sftpgo_user_backup,
+    create_sftpgo_backup_json,
     create_thelounge_user_files,
     generate_password,
     list_all_users_pending,
@@ -91,26 +91,17 @@ async def notify_tl_users(req: AuthenticatedRequest) -> Response:
     return Response(status_code=HTTPStatus.CREATED)
 
 
-@app.post("/create_sftpgo_new_users_json")
-async def create_fb_new_users_json(req: AuthenticatedRequest) -> Response:
+@app.post("/create_sftpgo_backup_json")
+async def create_ftpgo_backup_json(req: AuthenticatedRequest) -> Response:
     if not secrets.compare_digest(req.token, CONTROL_TOKEN):
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Invalid token")
 
-    await create_sftpgo_user_backup(sessionmaker=Session, new_only=True)
-    return Response(status_code=HTTPStatus.CREATED)
-
-
-@app.post("/create_sftpgo_complete_users_json")
-async def create_fb_complete_users_json(req: AuthenticatedRequest) -> Response:
-    if not secrets.compare_digest(req.token, CONTROL_TOKEN):
-        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Invalid token")
-
-    await create_sftpgo_user_backup(sessionmaker=Session, new_only=False)
+    await create_sftpgo_backup_json(sessionmaker=Session)
     return Response(status_code=HTTPStatus.CREATED)
 
 
 @app.post("/notify_sftpgo_users")
-async def notify_fb_users(req: AuthenticatedRequest) -> Response:
+async def notify_ftpgo_users(req: AuthenticatedRequest) -> Response:
     if not secrets.compare_digest(req.token, CONTROL_TOKEN):
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Invalid token")
 

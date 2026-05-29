@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "create_accounts",
-    "create_sftpgo_user_backup",
+    "create_sftpgo_backup_json",
     "create_thelounge_user_files",
     "generate_password",
     "list_all_users_pending",
@@ -71,7 +71,7 @@ def decode(data: bytes) -> str:
 
 
 def hash_bcrypt(password: str, rounds: int) -> str:
-    salt = bcrypt.gensalt(rounds=rounds)
+    salt = bcrypt.gensalt(rounds=rounds, prefix=b"2a")
     return decode(bcrypt.hashpw(password=encode(password), salt=salt))
 
 
@@ -190,15 +190,11 @@ def create_sftpgo_user(username: str, password: str) -> SFTPGoUser:
     return SFTPGoUser(username=username, password=password, home_dir=home)
 
 
-async def create_sftpgo_user_backup(sessionmaker: ASM, new_only: bool) -> None:
+async def create_sftpgo_backup_json(sessionmaker: ASM) -> None:
     loop = asyncio.get_running_loop()
     async with sessionmaker() as session:
         users: list[SFTPGoUser] = []
-        if new_only:
-            uquery = select(SFTPGoAccount).where(SFTPGoAccount.notified.is_(False))
-        else:
-            uquery = select(SFTPGoAccount)
-
+        uquery = select(SFTPGoAccount)
         ures = await session.stream(uquery)
         async for uacc in ures.scalars():
             user = create_sftpgo_user(username=uacc.username, password=uacc.password)
