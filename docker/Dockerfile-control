@@ -13,10 +13,11 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/home/ubuntu/.local/bin/:$PATH"
 ENV UV_PYTHON_INSTALL_DIR="/app/python"
 
-COPY --chown=ubuntu:ubuntu pyproject.toml uv.lock README.md alembic.ini .
+COPY --chown=ubuntu:ubuntu pyproject.toml uv.lock README.md .
 COPY --chown=ubuntu:ubuntu src/shared src/shared
+COPY --chown=ubuntu:ubuntu src/lldap_jwt src/lldap_jwt
+COPY --chown=ubuntu:ubuntu src/lldap_graphql src/lldap_graphql
 COPY --chown=ubuntu:ubuntu src/control src/control
-COPY --chown=ubuntu:ubuntu migrations migrations
 
 RUN uv sync --extra control --no-dev --no-editable --frozen \
     && rm -Rf pyproject.toml uv.lock README.md src

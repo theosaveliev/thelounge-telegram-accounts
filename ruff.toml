@@ -56,9 +56,24 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
-"tests/**" = ["S101", "PLR2004"]
-"migrations/**" = ["INP001"]
-"src/control/main.py" = ["TC001", "ARG001"]
+"test.py" = ["T201"]
+"src/lldap_graphql/*" = [
+    "TC003",
+    "PGH003",
+    "ANN201",
+    "ANN002",
+    "ANN003",
+    "ARG001",
+    "UP042",
+    "PYI019",
+    "ANN401",
+    "PLW2901",
+    "E501",
+    "TC002",
+    "ANN204",
+    "A002",
+    "D205",
+]
 
 [lint.isort]
 split-on-trailing-comma = false

@@ -1,6 +1,5 @@
 *.env
-*.session
-data/*
+*.session*
 
 .venv
 dist

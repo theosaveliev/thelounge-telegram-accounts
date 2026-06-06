@@ -1,8 +1,8 @@
 ---
 services:
   "tta-telegram-bot-dev":
-    image: "nett/tta-telegram-bot:0.2.6"
-    container_name: "tta-telegram-bot-dev"
+    image: "nett/tta-telegram-bot:0.3.0"
+    container_name: "telegram-bot-dev"
     volumes:
       - ../data:/app/data:rw
 

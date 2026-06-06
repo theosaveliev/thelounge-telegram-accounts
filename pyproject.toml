@@ -1,6 +1,6 @@
 [project]
 name = "thelounge-telegram-accounts"
-version = "0.2.7"
+version = "0.3.0"
 description = "Self-hosted tool built for a local community setup"
 readme = "README.md"
 license = { text = "MIT" }
@@ -20,19 +20,17 @@ keywords = ["telegram", "thelounge", "accounts"]
 requires-python = ">=3.14"
 
 dependencies = [
-    "fastapi>=0.136.1,<0.137.0",
+    "fastapi>=0.136.3,<0.137.0",
     "httpx>=0.28.1,<0.29.0",
     "pydantic>=2.13.4,<3.0.0",
-    "uvicorn>=0.47.0,<0.48.0",
+    "uvicorn>=0.49.0,<0.50.0",
     "uvloop>=0.22.1,<0.23.0",
 ]
 
 [project.optional-dependencies]
 control = [
-    "aiosqlite>=0.22.1,<0.23.0",
-    "alembic>=1.18.4,<2.0.0",
-    "bcrypt>=5.0.0,<6.0.0",
-    "sqlalchemy[asyncio]>=2.0.49,<3.0.0",
+    "ariadne-codegen>=0.18.0,<0.19.0",
+    "ldap3>=2.9.1,<3.0.0",
 ]
 
 telegram-bot = [
@@ -42,17 +40,16 @@ telegram-bot = [
 
 [dependency-groups]
 dev = [
-    "basedpyright>=1.38.4,<2.0.0",
-    "mypy>=1.19.1,<2.0.0",
-    "poethepoet>=0.42.1",
-    "ruff>=0.15.8",
-    "types-docker>=7.1.0.20260328,<8.0.0.0",
+    "basedpyright>=1.39.6,<2.0.0",
+    "mypy>=2.1.0,<3.0.0",
+    "poethepoet>=0.46.0,<0.47.0",
+    "ruff>=0.15.16,<0.16.0",
+    "types-ldap3>=2.9.13.20260518,<3.0.0.0",
 ]
 
 [project.scripts]
 telegram-bot = "telegram_bot.main:run"
 control = "control.main:run"
-control-dev = "control.main:dev"
 
 [project.urls]
 github = "https://github.com/theosaveliev/thelounge-telegram-accounts"
@@ -78,7 +75,7 @@ exclude = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/shared", "src/telegram_bot", "src/control"]
+packages = ["src/shared", "src/telegram_bot", "src/control", "src/lldap_jwt", "src/lldap_graphql"]
 
 [tool.poe.executor]
 type = "uv"
@@ -117,3 +114,10 @@ shell = """
     IMAGE_TAG=nett/tta-control:$(uv version --short)
     docker image push ${IMAGE_TAG}
 """
+
+[tool.ariadne-codegen]
+schema_path = "graphql/lldap.graphql"
+queries_path = "graphql/lldap-queries.graphql"
+target_package_name = "lldap_graphql"
+target_package_path = "src"
+async_client = true

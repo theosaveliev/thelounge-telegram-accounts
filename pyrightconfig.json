@@ -7,6 +7,8 @@
   "exclude": [
     "**/.venv",
     "**/__pycache__",
+    "src/lldap_graphql",
+    "src/shared/protocols.py"
   ],
   "reportMissingImports": "error",
   "reportMissingModuleSource": false,

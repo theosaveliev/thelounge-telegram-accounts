@@ -1,0 +1,128 @@
+mutation AddTelegramIdAttribute {
+  addUserAttribute(
+    name: "telegramId"
+    attributeType: STRING
+    isList: false
+    isVisible: true
+    isEditable: true
+  ) { ok }
+}
+
+mutation AddTelegramUsernameAttribute {
+  addUserAttribute(
+    name: "telegramUsername"
+    attributeType: STRING
+    isList: false
+    isVisible: true
+    isEditable: true
+  ) { ok }
+}
+
+fragment UserFields on User {
+  id
+  displayName
+  email
+  groups {
+    id
+    displayName
+  }
+  attributes {
+    name
+    value
+  }
+}
+
+query ListUsers {
+  users { ...UserFields }
+}
+
+query GetUserById($id: String!) {
+  user(userId: $id) {
+    ...UserFields
+  }
+}
+
+query GetUserByTelegramUsername($telegramUsername: String!) {
+  users(filters: { eq: { field: "telegramUsername", value: $telegramUsername } }) {
+    ...UserFields
+  }
+}
+
+query GetUsersByDisplayName($displayName: String!) {
+  users(filters: { eq: { field: "displayName", value: $displayName } }) {
+    ...UserFields
+  }
+}
+
+query GetUsersByGroup($group: String!) {
+  users(filters: { memberOf: $group }) {
+    ...UserFields
+  }
+}
+
+mutation CreateUser(
+    $id: String!,
+    $displayName: String!,
+    $telegramId: String!,
+    $telegramUsername: String!,
+    $email: String!
+  ) {
+  createUser(
+    user: {
+      id: $id
+      displayName: $displayName
+      email: $email
+      attributes: [
+        { name: "telegramId", value: [$telegramId] },
+        { name: "telegramUsername", value: [$telegramUsername] }
+      ]
+    }
+  ) { ...UserFields }
+}
+
+mutation UpdateUser(
+    $id: String!,
+    $displayName: String!,
+    $telegramId: String!,
+    $telegramUsername: String!,
+    $email: String!
+  ) {
+  updateUser(
+    user: {
+      id: $id
+      displayName: $displayName
+      email: $email
+      insertAttributes: [
+        { name: "telegramId", value: [$telegramId] },
+        { name: "telegramUsername", value: [$telegramUsername] }
+      ]
+    }
+  ) { ok }
+}
+
+mutation DeleteUser($userId: String!) {
+  deleteUser(userId: $userId) { ok }
+}
+
+query ListGroups {
+  groups { 
+    id
+    displayName 
+  }
+}
+
+mutation CreateGroup($name: String!) {
+  createGroup(name: $name) { id }
+}
+
+mutation DeleteGroup($groupId: Int!) {
+  deleteGroup(groupId: $groupId) { ok }
+}
+
+mutation AddUserToGroup($userId: String!, $groupId: Int!) {
+  addUserToGroup(userId: $userId, groupId: $groupId) { ok }
+}
+
+mutation RemoveUserFromGroup($userId: String!, $groupId: Int!) {
+  removeUserFromGroup(userId: $userId, groupId: $groupId) { ok }
+}

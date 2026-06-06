@@ -1,8 +1,8 @@
 ---
 services:
   "tta-control-dev":
-    image: "nett/tta-control:0.2.6"
-    container_name: "tta-control-dev"
+    image: "nett/tta-control:0.3.0"
+    container_name: "control-dev"
     volumes:
       - ../data:/app/data:rw
 
