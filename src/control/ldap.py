@@ -1,4 +1,3 @@
-import logging
 import os
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
@@ -15,8 +14,6 @@ LLDAP_LDAP_URL = os.environ["LLDAP_LDAP_URL"]
 LLDAP_BASE_DN = os.environ["LLDAP_BASE_DN"]
 LLDAP_USERNAME = os.environ["LLDAP_USERNAME"]
 LLDAP_PASSWORD = os.environ["LLDAP_PASSWORD"]
-
-logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -38,14 +35,12 @@ def make_connection() -> Generator[Connection]:
         conn.unbind()  # type: ignore[no-untyped-call]
 
 
-def set_password(user_id: str, password: str) -> bool:
+def set_password(user_id: str, password: str) -> None:
     user_dn = f"uid={user_id},{LLDAP_BASE_DN}"
     with make_connection() as conn:
         conn.extend.standard.modify_password(  # pyright: ignore[reportAny]
             user_dn, old_password=None, new_password=password
         )
 
-        if conn.result is None:  # pyright: ignore[reportAny]
-            return False
-
-        return bool(conn.result["result"] == 0)  # pyright: ignore[reportAny]
+        if conn.result["result"] != 0:  # pyright: ignore[reportAny]
+            raise RuntimeError("Cannot set password")

@@ -2,20 +2,23 @@
 # pyright: reportAny=false
 
 import os
+import time
 from typing import Any
 
 from httpx import AsyncClient, HTTPError, Request, Response
 
-from shared.protocols import current_timestamp
-
-__all__ = ["LldapJwtClient"]
+__all__ = ["JWTClient"]
 
 LLDAP_HTTP_URL = os.environ["LLDAP_HTTP_URL"]
 LLDAP_USERNAME = os.environ["LLDAP_USERNAME"]
 LLDAP_PASSWORD = os.environ["LLDAP_PASSWORD"]
 
 
-class LldapJwtClient(AsyncClient):
+def current_timestamp() -> int:
+    return int(time.time())
+
+
+class JWTClient(AsyncClient):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 

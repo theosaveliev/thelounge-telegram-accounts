@@ -1,36 +1,32 @@
 import asyncio
-import logging
-import os
 import secrets
 import string
-from http import HTTPStatus
 from typing import TYPE_CHECKING
-
-from fastapi import HTTPException
 
 import control.ldap
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
 
-    from lldap_graphql import Client as LldapGqlClient
-    from lldap_graphql import ListGroupsGroups as LldapGqlGroup
-    from lldap_graphql import UserFields as LldapGqlUser
-    from shared.schemas import AuthenticatedRequest, RegRequest
+    from lldap_graphql import Client as GQLClient
+    from shared.schemas import User
 
 __all__ = [
-    "bootstrap",
-    "fetch_group",
-    "fetch_user",
     "generate_password",
+    "get_group_id",
     "register_user",
-    "try_await",
-    "verify_token",
+    "try_ignore_unique_constraint",
 ]
 
-CONTROL_TOKEN = os.environ["CONTROL_TOKEN"]
 
-logger = logging.getLogger(__name__)
+# GQL doesn't provide exception class, so search for a string
+async def try_ignore_unique_constraint[T](coro: Awaitable[T]) -> None:
+    try:
+        await coro
+
+    except Exception as exc:
+        if "UNIQUE constraint failed" not in str(exc):
+            raise
 
 
 def generate_password(length: int) -> str:
@@ -45,67 +41,40 @@ def generate_password(length: int) -> str:
             return pw
 
 
-async def try_await[T](coro: Awaitable[T]) -> T | None:
-    try:
-        return await coro
-
-    except Exception as exc:
-        err = str(exc)
-
-        if "UNIQUE constraint" in err or "not found" in err:
-            logger.info(err)
-
-        else:
-            logger.error(err)
-            raise
-
-        return None
-
-
-async def bootstrap(client: LldapGqlClient) -> None:
-    await try_await(client.add_telegram_id_attribute())
-    await try_await(client.add_telegram_username_attribute())
-
-
-async def register_user(req: RegRequest, gql: LldapGqlClient) -> str | None:
-    user = await try_await(gql.get_user_by_id(req.id_str))
+async def register_user(user: User, gql: GQLClient) -> str:
+    """Create or update LLDAP user."""
+    lldap_user = user.to_lldap_user_dict()
     pw = generate_password(length=20)
 
-    if user is None:
-        await gql.create_user(**req.to_lldap_user())
+    found = await gql.get_users_by_telegram_id(str(user.id))
+    updating = False
+    for old in found.users:
+        if old.id == user.username:
+            updating = True
+
+        else:
+            await gql.delete_user(old.id)
+
+    if updating:
+        await gql.update_user(**lldap_user)
 
     else:
-        await gql.update_user(**req.to_lldap_user())
+        await gql.create_user(**lldap_user)
 
-    def set_password() -> bool:
-        return control.ldap.set_password(user_id=req.id_str, password=pw)
+    def set_password() -> None:
+        control.ldap.set_password(user_id=user.username, password=pw)
 
     loop = asyncio.get_running_loop()
-    ok = await loop.run_in_executor(None, set_password)
-    return pw if ok else None
+    await loop.run_in_executor(None, set_password)
+    return pw
 
 
-def verify_token(request: AuthenticatedRequest) -> None:
-    if not secrets.compare_digest(request.token, CONTROL_TOKEN):
-        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Invalid token")
-
-
-async def fetch_user(username: str, gql: LldapGqlClient) -> LldapGqlUser:
-    resp = await gql.get_user_by_telegram_username(username)
-    if len(resp.users) != 1:
-        raise HTTPException(
-            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail="Cannot find user"
-        )
-
-    return resp.users[0]
-
-
-async def fetch_group(display_name: str, gql: LldapGqlClient) -> LldapGqlGroup:
+async def get_group_id(group_name: str, gql: GQLClient) -> int:
     groups = await gql.list_groups()
-    matches = [g for g in groups.groups if g.display_name == display_name]
-    if len(matches) != 1:
-        raise HTTPException(
-            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail="Cannot find group"
-        )
+    try:
+        group = next(g for g in groups.groups if g.display_name == group_name)
 
-    return matches[0]
+    except StopIteration:
+        raise ValueError(f"Group not found: {group_name}") from None
+
+    return group.id

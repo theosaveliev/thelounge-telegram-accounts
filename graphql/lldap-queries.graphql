@@ -5,23 +5,14 @@ mutation AddTelegramIdAttribute {
     isList: false
     isVisible: true
     isEditable: true
-  ) { ok }
-}
-
-mutation AddTelegramUsernameAttribute {
-  addUserAttribute(
-    name: "telegramUsername"
-    attributeType: STRING
-    isList: false
-    isVisible: true
-    isEditable: true
-  ) { ok }
+  ) {
+    ok
+  }
 }
 
 fragment UserFields on User {
   id
   displayName
-  email
   groups {
     id
     displayName
@@ -33,7 +24,9 @@ fragment UserFields on User {
 }
 
 query ListUsers {
-  users { ...UserFields }
+  users {
+    ...UserFields
+  }
 }
 
 query GetUserById($id: String!) {
@@ -42,8 +35,8 @@ query GetUserById($id: String!) {
   }
 }
 
-query GetUserByTelegramUsername($telegramUsername: String!) {
-  users(filters: { eq: { field: "telegramUsername", value: $telegramUsername } }) {
+query GetUsersByTelegramId($telegramId: String!) {
+  users(filters: { eq: { field: "telegramId", value: $telegramId } }) {
     ...UserFields
   }
 }
@@ -54,75 +47,81 @@ query GetUsersByDisplayName($displayName: String!) {
   }
 }
 
-query GetUsersByGroup($group: String!) {
-  users(filters: { memberOf: $group }) {
+query GetUsersByGroup($groupName: String!) {
+  users(filters: { memberOf: $groupName }) {
     ...UserFields
   }
 }
 
 mutation CreateUser(
-    $id: String!,
-    $displayName: String!,
-    $telegramId: String!,
-    $telegramUsername: String!,
-    $email: String!
-  ) {
+  $id: String!
+  $telegramId: String!
+  $displayName: String!
+  $email: String!
+) {
   createUser(
     user: {
       id: $id
       displayName: $displayName
       email: $email
-      attributes: [
-        { name: "telegramId", value: [$telegramId] },
-        { name: "telegramUsername", value: [$telegramUsername] }
-      ]
+      attributes: [{ name: "telegramId", value: [$telegramId] }]
     }
-  ) { ...UserFields }
+  ) {
+    ...UserFields
+  }
 }
 
 mutation UpdateUser(
-    $id: String!,
-    $displayName: String!,
-    $telegramId: String!,
-    $telegramUsername: String!,
-    $email: String!
-  ) {
+  $id: String!
+  $telegramId: String!
+  $displayName: String!
+  $email: String!
+) {
   updateUser(
     user: {
       id: $id
       displayName: $displayName
       email: $email
-      insertAttributes: [
-        { name: "telegramId", value: [$telegramId] },
-        { name: "telegramUsername", value: [$telegramUsername] }
-      ]
+      insertAttributes: [{ name: "telegramId", value: [$telegramId] }]
     }
-  ) { ok }
+  ) {
+    ok
+  }
 }
 
 mutation DeleteUser($userId: String!) {
-  deleteUser(userId: $userId) { ok }
+  deleteUser(userId: $userId) {
+    ok
+  }
 }
 
 query ListGroups {
-  groups { 
+  groups {
     id
-    displayName 
+    displayName
   }
 }
 
 mutation CreateGroup($name: String!) {
-  createGroup(name: $name) { id }
+  createGroup(name: $name) {
+    id
+  }
 }
 
 mutation DeleteGroup($groupId: Int!) {
-  deleteGroup(groupId: $groupId) { ok }
+  deleteGroup(groupId: $groupId) {
+    ok
+  }
 }
 
 mutation AddUserToGroup($userId: String!, $groupId: Int!) {
-  addUserToGroup(userId: $userId, groupId: $groupId) { ok }
+  addUserToGroup(userId: $userId, groupId: $groupId) {
+    ok
+  }
 }
 
 mutation RemoveUserFromGroup($userId: String!, $groupId: Int!) {
-  removeUserFromGroup(userId: $userId, groupId: $groupId) { ok }
+  removeUserFromGroup(userId: $userId, groupId: $groupId) {
+    ok
+  }
 }

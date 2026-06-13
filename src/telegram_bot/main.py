@@ -2,22 +2,30 @@ import asyncio
 import logging
 import os
 import secrets
+from contextlib import asynccontextmanager
 from http import HTTPStatus
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
-import httpx
 import uvicorn
-import uvloop
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.responses import Response
-from telethon import TelegramClient, events
+from fastapi.security import APIKeyHeader
+from httpx import AsyncClient as HTTPAsyncClient
+from telethon import TelegramClient
+from telethon.events import NewMessage
 
-from shared.protocols import LogContext
-from shared.schemas import HTTPErrorResponse, NotifById, RegRequest, RegResponse
+from shared.schemas import (
+    HTTPErrorResponse,
+    NotificationById,
+    RegistrationResponse,
+    User,
+)
 
 if TYPE_CHECKING:
-    from telethon.events import NewMessage
+    from collections.abc import AsyncGenerator
 
+
+__all__ = ["app", "run"]
 
 BOT_LISTEN = os.environ["BOT_LISTEN"]
 BOT_PORT = int(os.environ["BOT_PORT"])
@@ -31,9 +39,37 @@ TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-app = FastAPI(docs_url=None, redoc_url=None)
+
 tg_client = TelegramClient(BOT_SESSION, TELEGRAM_API_ID, TELEGRAM_API_HASH)
-http_client = httpx.AsyncClient()
+http_client = HTTPAsyncClient()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG001
+    await tg_client.connect()
+    await tg_client.sign_in(bot_token=TELEGRAM_TOKEN)
+    tg_client.on(NewMessage(pattern="/start"))(handle_start)
+    loop = asyncio.get_running_loop()
+    tg_task = loop.create_task(tg_client.run_until_disconnected())
+
+    yield
+
+    tg_task.cancel()
+    await asyncio.gather(tg_task, return_exceptions=True)
+    await tg_client.disconnect()
+    await http_client.aclose()
+
+
+header_scheme = APIKeyHeader(name="X-API-Key")
+
+
+async def verify_token(api_key: Annotated[str, Depends(header_scheme)]) -> None:
+    if not secrets.compare_digest(api_key, BOT_TOKEN):
+        raise HTTPException(HTTPStatus.FORBIDDEN, "Invalid token")
+
+
+app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
+auth_app = APIRouter(dependencies=[Depends(verify_token)])
 
 
 @app.get("/health")
@@ -41,46 +77,39 @@ async def health() -> Response:
     return Response(status_code=HTTPStatus.OK)
 
 
-@app.post("/notify")
-async def notify(req: NotifById) -> Response:
-    if not secrets.compare_digest(req.token, BOT_TOKEN):
-        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Invalid token")
-
-    log = LogContext("/notify", id=req.id, timestamp=req.timestamp)
-    logger.info(log)
-
-    await tg_client.send_message(req.id, req.message)
-    return Response(status_code=HTTPStatus.CREATED)
+@auth_app.post("/notification")
+async def notify(req: NotificationById) -> Response:
+    await tg_client.send_message(req.recipient, req.message)
+    return Response(status_code=HTTPStatus.OK)
 
 
-type ControlResponse = RegResponse | HTTPErrorResponse
+async def send_registration(req: User) -> RegistrationResponse:
+    url = f"{CONTROL_URL}/user"
+    headers = {"X-API-Key": CONTROL_TOKEN}
+    resp = await http_client.put(url, headers=headers, json=req.model_dump())
+
+    if resp.status_code == HTTPStatus.OK:
+        return RegistrationResponse.model_validate(resp.json())
+
+    err = HTTPErrorResponse.model_validate(resp.json())
+    raise RuntimeError(err.detail)
 
 
-async def send_registration(req: RegRequest) -> ControlResponse:
-    resp = await http_client.post(f"{CONTROL_URL}/register_user", json=req.model_dump())
-
-    if resp.status_code == HTTPStatus.CREATED:
-        return RegResponse.model_validate(resp.json())
-
-    return HTTPErrorResponse.model_validate(resp.json())
-
-
-async def register_user(event: NewMessage.Event) -> None:
+async def handle_start(event: NewMessage.Event) -> None:
     sender = await event.get_sender()
-    req = RegRequest.from_telegram_user(user=sender, token=CONTROL_TOKEN)
 
-    log = LogContext("/register_user", id=req.id, timestamp=req.timestamp)
-    logger.info(log)
+    try:
+        req = User.from_telegram_user(sender)
+        result = await send_registration(req)
 
-    result = await send_registration(req)
-
-    if isinstance(result, HTTPErrorResponse):
-        await event.respond(result.detail)
-        raise RuntimeError(result.detail)
+    except (ValueError, RuntimeError) as err:
+        logger.info(err)
+        await event.respond(str(err))
+        return
 
     message = (
-        "**Welcome aboard!**\nPlease save the credentials:\n\n"
-        f"**Login:** {sender.username}\n"
+        "Your new credentials:\n\n"
+        f"**Login:** {req.username}\n"
         f"**Password:** {result.password}\n\n"
         "Our team is currently setting up your access. We will send a confirmation "
         "message as soon as your account is ready to use."
@@ -89,67 +118,14 @@ async def register_user(event: NewMessage.Event) -> None:
     await event.respond(message)
 
 
-FORBIDDEN = {
-    "restricted": (
-        "**Access denied:** your Telegram account currently has active restrictions."
-    ),
-    "scam": (
-        "**Access denied:** this account has been flagged for suspicious activity."
-    ),
-    "fake": (
-        "**Access denied:** this account appears to be impersonating another user."
-    ),
-    "bot": ("**Access denied:** no bots allowed."),
-}
-
-
-async def validate_sender(event: NewMessage.Event) -> None:
-    sender = await event.get_sender()
-    for attr, message in FORBIDDEN.items():
-        if getattr(sender, attr, None):
-            await event.respond(message)
-            raise ValueError(message)
-
-    if not isinstance(sender.username, str):
-        message = (
-            "A @username is required. Please update your profile and send /start again."
-        )
-
-        await event.respond(message)
-        raise ValueError(message)
-
-
-async def handle_start(event: NewMessage.Event) -> None:
-    await validate_sender(event)
-    await register_user(event)
-
-
-async def main() -> None:
-    await tg_client.connect()
-    await tg_client.sign_in(bot_token=TELEGRAM_TOKEN)
-    tg_client.on(events.NewMessage(pattern="/start"))(handle_start)
-
-    config = uvicorn.Config(
-        app, host=BOT_LISTEN, port=BOT_PORT, loop="none", log_config=None
-    )
-
-    server = uvicorn.Server(config)
-    log = LogContext("bot_main", state="Running")
-    logger.info(log)
-
-    try:
-        async with asyncio.TaskGroup() as tg:
-            tg.create_task(tg_client.run_until_disconnected())
-            tg.create_task(server.serve())
-
-    except* KeyboardInterrupt, asyncio.CancelledError:
-        log["state"] = "Shutting down"
-        logger.info(log)
-
-    finally:
-        await tg_client.disconnect()
-        await http_client.aclose()
+app.include_router(auth_app)
 
 
 def run() -> None:
-    asyncio.run(main(), loop_factory=uvloop.new_event_loop)
+    uvicorn.run(
+        "telegram_bot.main:app",
+        host=BOT_LISTEN,
+        port=BOT_PORT,
+        loop="uvloop",
+        log_config=None,
+    )

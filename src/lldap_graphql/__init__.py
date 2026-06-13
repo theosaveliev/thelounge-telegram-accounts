@@ -4,10 +4,6 @@ from .add_telegram_id_attribute import (
     AddTelegramIdAttribute,
     AddTelegramIdAttributeAddUserAttribute,
 )
-from .add_telegram_username_attribute import (
-    AddTelegramUsernameAttribute,
-    AddTelegramUsernameAttributeAddUserAttribute,
-)
 from .add_user_to_group import AddUserToGroup, AddUserToGroupAddUserToGroup
 from .async_base_client import AsyncBaseClient
 from .base_model import BaseModel, Upload
@@ -26,12 +22,9 @@ from .exceptions import (
 )
 from .fragments import UserFields, UserFieldsAttributes, UserFieldsGroups
 from .get_user_by_id import GetUserById, GetUserByIdUser
-from .get_user_by_telegram_username import (
-    GetUserByTelegramUsername,
-    GetUserByTelegramUsernameUsers,
-)
 from .get_users_by_display_name import GetUsersByDisplayName, GetUsersByDisplayNameUsers
 from .get_users_by_group import GetUsersByGroup, GetUsersByGroupUsers
+from .get_users_by_telegram_id import GetUsersByTelegramId, GetUsersByTelegramIdUsers
 from .input_types import (
     AttributeValueInput,
     CreateGroupInput,
@@ -52,8 +45,6 @@ from .update_user import UpdateUser, UpdateUserUpdateUser
 __all__ = [
     "AddTelegramIdAttribute",
     "AddTelegramIdAttributeAddUserAttribute",
-    "AddTelegramUsernameAttribute",
-    "AddTelegramUsernameAttributeAddUserAttribute",
     "AddUserToGroup",
     "AddUserToGroupAddUserToGroup",
     "AsyncBaseClient",
@@ -74,12 +65,12 @@ __all__ = [
     "EqualityConstraint",
     "GetUserById",
     "GetUserByIdUser",
-    "GetUserByTelegramUsername",
-    "GetUserByTelegramUsernameUsers",
     "GetUsersByDisplayName",
     "GetUsersByDisplayNameUsers",
     "GetUsersByGroup",
     "GetUsersByGroupUsers",
+    "GetUsersByTelegramId",
+    "GetUsersByTelegramIdUsers",
     "GraphQLClientError",
     "GraphQLClientGraphQLError",
     "GraphQLClientGraphQLMultiError",

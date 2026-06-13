@@ -9,7 +9,6 @@ from .base_model import BaseModel
 class UserFields(BaseModel):
     id: str
     display_name: str = Field(alias="displayName")
-    email: str
     groups: list[UserFieldsGroups]
     attributes: list[UserFieldsAttributes]
 

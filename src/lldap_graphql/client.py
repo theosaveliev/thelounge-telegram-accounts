@@ -4,7 +4,6 @@
 from typing import Any
 
 from .add_telegram_id_attribute import AddTelegramIdAttribute
-from .add_telegram_username_attribute import AddTelegramUsernameAttribute
 from .add_user_to_group import AddUserToGroup
 from .async_base_client import AsyncBaseClient
 from .create_group import CreateGroup
@@ -12,9 +11,9 @@ from .create_user import CreateUser
 from .delete_group import DeleteGroup
 from .delete_user import DeleteUser
 from .get_user_by_id import GetUserById
-from .get_user_by_telegram_username import GetUserByTelegramUsername
 from .get_users_by_display_name import GetUsersByDisplayName
 from .get_users_by_group import GetUsersByGroup
+from .get_users_by_telegram_id import GetUsersByTelegramId
 from .list_groups import ListGroups
 from .list_users import ListUsers
 from .remove_user_from_group import RemoveUserFromGroup
@@ -50,32 +49,6 @@ class Client(AsyncBaseClient):
         data = self.get_data(response)
         return AddTelegramIdAttribute.model_validate(data)
 
-    async def add_telegram_username_attribute(
-        self, **kwargs: Any
-    ) -> AddTelegramUsernameAttribute:
-        query = gql("""
-            mutation AddTelegramUsernameAttribute {
-              addUserAttribute(
-                name: "telegramUsername"
-                attributeType: STRING
-                isList: false
-                isVisible: true
-                isEditable: true
-              ) {
-                ok
-              }
-            }
-            """)
-        variables: dict[str, object] = {}
-        response = await self.execute(
-            query=query,
-            operation_name="AddTelegramUsernameAttribute",
-            variables=variables,
-            **kwargs,
-        )
-        data = self.get_data(response)
-        return AddTelegramUsernameAttribute.model_validate(data)
-
     async def list_users(self, **kwargs: Any) -> ListUsers:
         query = gql("""
             query ListUsers {
@@ -87,7 +60,6 @@ class Client(AsyncBaseClient):
             fragment UserFields on User {
               id
               displayName
-              email
               groups {
                 id
                 displayName
@@ -116,7 +88,6 @@ class Client(AsyncBaseClient):
             fragment UserFields on User {
               id
               displayName
-              email
               groups {
                 id
                 displayName
@@ -134,12 +105,12 @@ class Client(AsyncBaseClient):
         data = self.get_data(response)
         return GetUserById.model_validate(data)
 
-    async def get_user_by_telegram_username(
-        self, telegram_username: str, **kwargs: Any
-    ) -> GetUserByTelegramUsername:
+    async def get_users_by_telegram_id(
+        self, telegram_id: str, **kwargs: Any
+    ) -> GetUsersByTelegramId:
         query = gql("""
-            query GetUserByTelegramUsername($telegramUsername: String!) {
-              users(filters: {eq: {field: "telegramUsername", value: $telegramUsername}}) {
+            query GetUsersByTelegramId($telegramId: String!) {
+              users(filters: {eq: {field: "telegramId", value: $telegramId}}) {
                 ...UserFields
               }
             }
@@ -147,7 +118,6 @@ class Client(AsyncBaseClient):
             fragment UserFields on User {
               id
               displayName
-              email
               groups {
                 id
                 displayName
@@ -158,15 +128,15 @@ class Client(AsyncBaseClient):
               }
             }
             """)
-        variables: dict[str, object] = {"telegramUsername": telegram_username}
+        variables: dict[str, object] = {"telegramId": telegram_id}
         response = await self.execute(
             query=query,
-            operation_name="GetUserByTelegramUsername",
+            operation_name="GetUsersByTelegramId",
             variables=variables,
             **kwargs,
         )
         data = self.get_data(response)
-        return GetUserByTelegramUsername.model_validate(data)
+        return GetUsersByTelegramId.model_validate(data)
 
     async def get_users_by_display_name(
         self, display_name: str, **kwargs: Any
@@ -181,7 +151,6 @@ class Client(AsyncBaseClient):
             fragment UserFields on User {
               id
               displayName
-              email
               groups {
                 id
                 displayName
@@ -202,10 +171,12 @@ class Client(AsyncBaseClient):
         data = self.get_data(response)
         return GetUsersByDisplayName.model_validate(data)
 
-    async def get_users_by_group(self, group: str, **kwargs: Any) -> GetUsersByGroup:
+    async def get_users_by_group(
+        self, group_name: str, **kwargs: Any
+    ) -> GetUsersByGroup:
         query = gql("""
-            query GetUsersByGroup($group: String!) {
-              users(filters: {memberOf: $group}) {
+            query GetUsersByGroup($groupName: String!) {
+              users(filters: {memberOf: $groupName}) {
                 ...UserFields
               }
             }
@@ -213,7 +184,6 @@ class Client(AsyncBaseClient):
             fragment UserFields on User {
               id
               displayName
-              email
               groups {
                 id
                 displayName
@@ -224,7 +194,7 @@ class Client(AsyncBaseClient):
               }
             }
             """)
-        variables: dict[str, object] = {"group": group}
+        variables: dict[str, object] = {"groupName": group_name}
         response = await self.execute(
             query=query, operation_name="GetUsersByGroup", variables=variables, **kwargs
         )
@@ -232,18 +202,12 @@ class Client(AsyncBaseClient):
         return GetUsersByGroup.model_validate(data)
 
     async def create_user(
-        self,
-        id: str,
-        display_name: str,
-        telegram_id: str,
-        telegram_username: str,
-        email: str,
-        **kwargs: Any,
+        self, id: str, telegram_id: str, display_name: str, email: str, **kwargs: Any
     ) -> CreateUser:
         query = gql("""
-            mutation CreateUser($id: String!, $displayName: String!, $telegramId: String!, $telegramUsername: String!, $email: String!) {
+            mutation CreateUser($id: String!, $telegramId: String!, $displayName: String!, $email: String!) {
               createUser(
-                user: {id: $id, displayName: $displayName, email: $email, attributes: [{name: "telegramId", value: [$telegramId]}, {name: "telegramUsername", value: [$telegramUsername]}]}
+                user: {id: $id, displayName: $displayName, email: $email, attributes: [{name: "telegramId", value: [$telegramId]}]}
               ) {
                 ...UserFields
               }
@@ -252,7 +216,6 @@ class Client(AsyncBaseClient):
             fragment UserFields on User {
               id
               displayName
-              email
               groups {
                 id
                 displayName
@@ -265,9 +228,8 @@ class Client(AsyncBaseClient):
             """)
         variables: dict[str, object] = {
             "id": id,
-            "displayName": display_name,
             "telegramId": telegram_id,
-            "telegramUsername": telegram_username,
+            "displayName": display_name,
             "email": email,
         }
         response = await self.execute(
@@ -277,18 +239,12 @@ class Client(AsyncBaseClient):
         return CreateUser.model_validate(data)
 
     async def update_user(
-        self,
-        id: str,
-        display_name: str,
-        telegram_id: str,
-        telegram_username: str,
-        email: str,
-        **kwargs: Any,
+        self, id: str, telegram_id: str, display_name: str, email: str, **kwargs: Any
     ) -> UpdateUser:
         query = gql("""
-            mutation UpdateUser($id: String!, $displayName: String!, $telegramId: String!, $telegramUsername: String!, $email: String!) {
+            mutation UpdateUser($id: String!, $telegramId: String!, $displayName: String!, $email: String!) {
               updateUser(
-                user: {id: $id, displayName: $displayName, email: $email, insertAttributes: [{name: "telegramId", value: [$telegramId]}, {name: "telegramUsername", value: [$telegramUsername]}]}
+                user: {id: $id, displayName: $displayName, email: $email, insertAttributes: [{name: "telegramId", value: [$telegramId]}]}
               ) {
                 ok
               }
@@ -296,9 +252,8 @@ class Client(AsyncBaseClient):
             """)
         variables: dict[str, object] = {
             "id": id,
-            "displayName": display_name,
             "telegramId": telegram_id,
-            "telegramUsername": telegram_username,
+            "displayName": display_name,
             "email": email,
         }
         response = await self.execute(

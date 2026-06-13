@@ -1,65 +1,57 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
-from pydantic import BaseModel, Field, field_validator
-
-from .protocols import current_timestamp
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from .protocols import TelegramUser
+    from telethon.types import User as TelegramUser
+
+    from lldap_graphql import UserFields as LLDAPUser
 
 __all__ = [
-    "AuthenticatedRequest",
+    "GroupRequest",
     "HTTPErrorResponse",
-    "NotifById",
-    "NotifByUser",
-    "QueryWithCN",
-    "QueryWithDisp",
-    "QueryWithId",
-    "QueryWithUser",
-    "RegRequest",
-    "RegResponse",
-    "UserMod",
+    "NotificationById",
+    "NotificationByUsername",
+    "RegistrationResponse",
+    "User",
+    "UserFilter",
 ]
 
+IRCD_MAX_NICK_LENGTH = 31
+TELEGRAM_USERNAME_PATTERN = r"^[a-zA-Z0-9_]+$"
 
-class AuthenticatedRequest(BaseModel):
-    token: str = Field(min_length=64, max_length=64)
-    timestamp: int = Field(gt=0, le=9_999_999_999, default_factory=current_timestamp)
+# LLDAP uses sqlite3 varchar(255)
+Identifier = Annotated[str, Field(min_length=1, max_length=255)]
 
-    @field_validator("token")
+Username = Annotated[
+    str,
+    Field(
+        min_length=1, max_length=IRCD_MAX_NICK_LENGTH, pattern=TELEGRAM_USERNAME_PATTERN
+    ),
+]
+
+# Telegram User ID range
+Number = Annotated[int, Field(ge=1, le=999_999_999_999)]
+
+
+class User(BaseModel):
+    id: Number
+    username: Username
+    full_name: Identifier
+
     @classmethod
-    def validate_isalnum(cls, v: str) -> str:
-        if not v.isalnum():
-            raise ValueError("Value is not alphanumeric")
+    def from_telegram_user(cls, user: TelegramUser) -> User:
+        if not user.username:
+            raise ValueError("Telegram @username is required.")
 
-        return v
+        if len(user.username) > IRCD_MAX_NICK_LENGTH:
+            raise ValueError("Telegram @username is too long.")
 
+        if user.restricted or user.scam or user.fake:
+            raise ValueError("Telegram account has active restrictions.")
 
-class QueryWithId(AuthenticatedRequest):
-    id: int = Field(gt=0, le=999_999_999_999)
-
-    @property
-    def id_str(self) -> str:
-        return str(self.id)
-
-
-class QueryWithUser(AuthenticatedRequest):
-    username: str = Field(pattern=r"^\w{5,32}$")
-
-
-class QueryWithDisp(AuthenticatedRequest):
-    display_name: str = Field(min_length=1, max_length=129)
-
-
-class QueryWithCN(AuthenticatedRequest):
-    cn: str = Field(min_length=1, max_length=64)
-
-
-class RegRequest(QueryWithId, QueryWithUser, QueryWithDisp):
-    @classmethod
-    def from_telegram_user(cls, user: TelegramUser, token: str) -> RegRequest:
-        if user.username is None:
-            raise ValueError("@username is required.")
+        if user.bot:
+            raise ValueError("No bots allowed.")
 
         if user.first_name and user.last_name:
             dn = f"{user.first_name} {user.last_name}"
@@ -68,33 +60,51 @@ class RegRequest(QueryWithId, QueryWithUser, QueryWithDisp):
         else:
             dn = user.username
 
-        return cls(id=user.id, username=user.username, display_name=dn, token=token)
+        return cls(id=user.id, username=user.username, full_name=dn)
 
-    def to_lldap_user(self) -> dict[str, str]:
+    @classmethod
+    def from_lldap_user(cls, user: LLDAPUser) -> User:
+        try:
+            attr = next(a for a in user.attributes if a.name == "telegramid")
+            tg_id = int(attr.value[0])
+
+        except IndexError, ValueError, StopIteration:
+            raise ValueError(f"Missing Telegram Id: {user.id}") from None
+
+        return cls(id=tg_id, username=user.id, full_name=user.display_name)
+
+    def to_lldap_user_dict(self) -> dict[str, str]:
         return {
-            "id": self.id_str,
-            "display_name": self.display_name,
-            "telegram_id": self.id_str,
-            "telegram_username": self.username,
-            "email": f"{self.username}@telegram.local",
+            "id": self.username,
+            "telegram_id": str(self.id),
+            "display_name": self.full_name,
+            "email": f"{self.username}@control",
         }
 
 
-class RegResponse(BaseModel):
-    password: str = Field(min_length=1, max_length=500)
+class UserFilter(BaseModel):
+    telegram_id: Number | None = None
+    full_name: Identifier | None = None
+    group: Identifier | None = None
+
+
+class RegistrationResponse(BaseModel):
+    password: Identifier
 
 
 class HTTPErrorResponse(BaseModel):
-    detail: str = Field(min_length=1, max_length=500)
+    detail: Identifier
 
 
-class NotifById(QueryWithId):
-    message: str = Field(min_length=1, max_length=500)
+class NotificationById(BaseModel):
+    recipient: Number
+    message: Identifier
 
 
-class NotifByUser(QueryWithUser):
-    message: str = Field(min_length=1, max_length=500)
+class NotificationByUsername(BaseModel):
+    recipient: Username
+    message: Identifier
 
 
-class UserMod(QueryWithUser, QueryWithCN):
-    pass
+class GroupRequest(BaseModel):
+    group: Identifier
